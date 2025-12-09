@@ -44,9 +44,10 @@ patterns=(
 
 found_secrets=0
 for pattern in "${patterns[@]}"; do
-    if git grep -q -E "$pattern" -- ':!.env' ':!.env.example'; then
+    # Исключаем .env, .env.example, check_secrets.sh и файлы документации с примерами
+    if git grep -q -E "$pattern" -- ':!.env' ':!.env.example' ':!check_secrets.sh' ':!*.md'; then
         echo -e "${RED}❌ Найден возможный секретный ключ: $pattern${NC}"
-        git grep -n -E "$pattern" -- ':!.env' ':!.env.example'
+        git grep -n -E "$pattern" -- ':!.env' ':!.env.example' ':!check_secrets.sh' ':!*.md'
         ((found_secrets++))
         ((errors++))
     fi

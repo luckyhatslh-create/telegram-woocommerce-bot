@@ -49,10 +49,10 @@ cp .env.example .env
 
 ```env
 TELEGRAM_BOT_TOKEN=123456789:ABCdefGHIjklMNOpqrsTUVwxyz
-OPENAI_API_KEY=sk-proj-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+OPENAI_API_KEY=sk-EXAMPLE_your_openai_api_key_here
 WC_URL=https://yourstore.com
-WC_KEY=ck_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-WC_SECRET=cs_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+WC_KEY=ck_EXAMPLE_your_consumer_key_here
+WC_SECRET=cs_EXAMPLE_your_consumer_secret_here
 ```
 
 ### 3. Получение необходимых ключей
