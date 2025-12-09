@@ -54,11 +54,11 @@ nano .env  # или любой другой редактор
 
 Пример заполнения:
 ```env
-TELEGRAM_BOT_TOKEN=5678901234:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw
-OPENAI_API_KEY=sk-proj-abc123def456ghi789jkl012mno345pqr678stu901vwx
+TELEGRAM_BOT_TOKEN=1234567890:AAAAAAA-ExampleToken-BBBBBBBBBBB
+OPENAI_API_KEY=sk-EXAMPLE_KEY_NOT_REAL_xxxxxxxxxxxxxxxxx
 WC_URL=https://myshop.ru
-WC_KEY=ck_1234567890abcdef1234567890abcdef12345678
-WC_SECRET=cs_1234567890abcdef1234567890abcdef12345678
+WC_KEY=ck_EXAMPLE_CONSUMER_KEY_xxxxxxxxxxxxxxxxx
+WC_SECRET=cs_EXAMPLE_CONSUMER_SECRET_xxxxxxxxxxxx
 ```
 
 ## Шаг 4: Проверка подключения
