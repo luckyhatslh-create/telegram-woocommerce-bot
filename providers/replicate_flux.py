@@ -1,8 +1,10 @@
 import base64
+import time
 import requests
 from typing import Dict
 
 import replicate
+from replicate.exceptions import ReplicateError
 
 from config import CONFIG
 from utils.logging import get_logger
@@ -26,7 +28,22 @@ def generate_base_model_image(prompt: str, width: int, height: int, steps: int) 
         "disable_safety_checker": True,
     }
     logger.info("Запуск FLUX base генерации: %s", input_payload)
-    output = client.run(CONFIG.providers.flux_base_model, input=input_payload)
+
+    # Retry logic для обработки rate limiting (429 errors)
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            output = client.run(CONFIG.providers.flux_base_model, input=input_payload)
+            break
+        except ReplicateError as e:
+            if e.status == 429 and attempt < max_retries - 1:
+                wait_time = 10  # Ждем 10 секунд перед повторной попыткой
+                logger.warning(f"Rate limit достигнут, ожидание {wait_time}s перед попыткой {attempt + 2}/{max_retries}")
+                time.sleep(wait_time)
+            else:
+                logger.error(f"Replicate API error после {attempt + 1} попыток: %s", e)
+                raise
+
     image_url = output[0] if isinstance(output, list) else str(output)
     return _fetch_image(image_url)
 
@@ -46,6 +63,21 @@ def inpaint_hat(base_image: bytes, mask_image: bytes, prompt: str, steps: int) -
         "disable_safety_checker": True,
     }
     logger.info("Запуск FLUX fill для инпейнтинга")
-    output = client.run(CONFIG.providers.flux_fill_model, input=input_payload)
+
+    # Retry logic для обработки rate limiting (429 errors)
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            output = client.run(CONFIG.providers.flux_fill_model, input=input_payload)
+            break
+        except ReplicateError as e:
+            if e.status == 429 and attempt < max_retries - 1:
+                wait_time = 10  # Ждем 10 секунд перед повторной попыткой
+                logger.warning(f"Rate limit достигнут, ожидание {wait_time}s перед попыткой {attempt + 2}/{max_retries}")
+                time.sleep(wait_time)
+            else:
+                logger.error(f"Replicate API error после {attempt + 1} попыток: %s", e)
+                raise
+
     image_url = output[0] if isinstance(output, list) else str(output)
     return _fetch_image(image_url)
