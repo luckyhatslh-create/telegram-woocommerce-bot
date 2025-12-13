@@ -1,3 +1,4 @@
+import base64
 import json
 from typing import Dict, Any
 
@@ -21,6 +22,9 @@ def extract_product_spec(image_bytes: bytes, client: Anthropic | None = None) ->
     if not image_bytes:
         raise ValueError("Пустое изображение для анализа")
 
+    # Конвертируем байты в base64 строку
+    image_b64 = base64.b64encode(image_bytes).decode('utf-8')
+
     client = client or Anthropic(api_key=CONFIG.providers.anthropic_api_key)
     try:
         message = client.messages.create(
@@ -34,7 +38,7 @@ def extract_product_spec(image_bytes: bytes, client: Anthropic | None = None) ->
                     "content": [
                         {"type": "text", "text": PROMPT},
                         {
-                            "type": "image", "source": {"type": "base64", "media_type": "image/png", "data": image_bytes}
+                            "type": "image", "source": {"type": "base64", "media_type": "image/png", "data": image_b64}
                         },
                     ],
                 }
