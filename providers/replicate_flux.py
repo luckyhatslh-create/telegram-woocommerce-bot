@@ -1,3 +1,4 @@
+import base64
 import requests
 from typing import Dict
 
@@ -32,10 +33,15 @@ def generate_base_model_image(prompt: str, width: int, height: int, steps: int) 
 
 def inpaint_hat(base_image: bytes, mask_image: bytes, prompt: str, steps: int) -> bytes:
     client = replicate.Client(api_token=CONFIG.providers.replicate_api_token)
+
+    # Конвертируем изображения в data URIs для Replicate API
+    base_image_uri = f"data:image/png;base64,{base64.b64encode(base_image).decode('utf-8')}"
+    mask_image_uri = f"data:image/png;base64,{base64.b64encode(mask_image).decode('utf-8')}"
+
     input_payload: Dict[str, object] = {
         "prompt": prompt,
-        "image": base_image,
-        "mask": mask_image,
+        "image": base_image_uri,
+        "mask": mask_image_uri,
         "num_inference_steps": steps,
         "disable_safety_checker": True,
     }
