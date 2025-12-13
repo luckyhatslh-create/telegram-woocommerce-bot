@@ -87,6 +87,7 @@ def check_woocommerce():
     url = os.getenv('WC_URL')
     key = os.getenv('WC_KEY')
     secret = os.getenv('WC_SECRET')
+    version = os.getenv('WC_VERSION', 'wc/v3')
 
     if not all([url, key, secret]):
         print("⚠️ WooCommerce credentials не установлены в .env (можно пропустить, если не используется)")
@@ -99,7 +100,7 @@ def check_woocommerce():
             url=url,
             consumer_key=key,
             consumer_secret=secret,
-            version="wc/v3",
+            version=version,
             timeout=10
         )
 

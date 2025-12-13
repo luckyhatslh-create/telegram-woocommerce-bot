@@ -1,5 +1,5 @@
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal
 
 QualityMode = Literal["preview", "hq"]
@@ -22,7 +22,7 @@ def get_int(name: str, default: int) -> int:
 @dataclass
 class ProviderSettings:
     anthropic_api_key: str = get_env("ANTHROPIC_API_KEY", "")
-    anthropic_model: str = get_env("ANTHROPIC_MODEL", "claude-3-5-sonnet-latest")
+    anthropic_model: str = get_env("ANTHROPIC_MODEL", "claude-3-haiku-20240307")
     replicate_api_token: str = get_env("REPLICATE_API_TOKEN", "")
     flux_base_model: str = get_env("FLUX_BASE_MODEL", "black-forest-labs/flux-schnell")
     flux_fill_model: str = get_env("FLUX_FILL_MODEL", "black-forest-labs/flux-fill-pro")
@@ -45,9 +45,9 @@ class TelegramSettings:
 
 @dataclass
 class AppConfig:
-    providers: ProviderSettings = ProviderSettings()
-    pipeline: PipelineSettings = PipelineSettings()
-    telegram: TelegramSettings = TelegramSettings()
+    providers: ProviderSettings = field(default_factory=ProviderSettings)
+    pipeline: PipelineSettings = field(default_factory=PipelineSettings)
+    telegram: TelegramSettings = field(default_factory=TelegramSettings)
 
 
 CONFIG = AppConfig()
