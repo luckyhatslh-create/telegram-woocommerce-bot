@@ -8,11 +8,13 @@ from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
 
+# ВАЖНО: load_dotenv() должен быть ДО импорта config
+load_dotenv()
+
 from config import CONFIG
 from pipeline.hat_on_model import generate_hat_on_model
 from utils.logging import get_logger
 
-load_dotenv()
 logger = get_logger(__name__)
 
 
@@ -60,7 +62,8 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     await update.message.reply_text("💾 Метаданные сохранены. Если нужен HQ режим, задайте QUALITY_MODE=hq или STEPS_HQ.")
 
 
-async def main() -> None:
+def main() -> None:
+    """Главная функция запуска бота"""
     token = CONFIG.telegram.token
     if not token:
         raise RuntimeError("TELEGRAM_BOT_TOKEN не задан")
@@ -70,8 +73,9 @@ async def main() -> None:
     application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
 
     logger.info("Бот запущен в режиме %s", CONFIG.pipeline.quality_mode)
-    await application.run_polling(allowed_updates=Update.ALL_TYPES)
+    # Используем синхронный метод run_polling для совместимости с Python 3.13
+    application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
