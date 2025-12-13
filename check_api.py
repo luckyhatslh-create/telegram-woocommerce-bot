@@ -6,6 +6,8 @@ from dotenv import load_dotenv
 # Загружаем переменные окружения
 load_dotenv()
 
+from config import CONFIG
+
 
 def check_telegram():
     """Проверка Telegram Bot Token"""
@@ -34,7 +36,10 @@ def check_telegram():
 def check_anthropic():
     """Проверка Anthropic API"""
     print("\n🔍 Проверка Anthropic API...")
-    api_key = os.getenv('ANTHROPIC_API_KEY')
+    api_key = CONFIG.providers.anthropic_api_key
+    model = CONFIG.providers.anthropic_model
+
+    print(f"ℹ️ Используемая модель Anthropic: {model}")
 
     if not api_key:
         print("❌ ANTHROPIC_API_KEY не установлен в .env")
@@ -45,7 +50,7 @@ def check_anthropic():
 
         client = Anthropic(api_key=api_key)
         message = client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model=model,
             max_tokens=1,
             messages=[{"role": "user", "content": "ping"}],
         )

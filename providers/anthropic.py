@@ -24,7 +24,7 @@ def extract_product_spec(image_bytes: bytes, client: Anthropic | None = None) ->
     client = client or Anthropic(api_key=CONFIG.providers.anthropic_api_key)
     try:
         message = client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model=CONFIG.providers.anthropic_model,
             max_tokens=400,
             temperature=0,
             system="Return only valid minified JSON.",

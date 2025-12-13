@@ -22,6 +22,7 @@ def get_int(name: str, default: int) -> int:
 @dataclass
 class ProviderSettings:
     anthropic_api_key: str = get_env("ANTHROPIC_API_KEY", "")
+    anthropic_model: str = get_env("ANTHROPIC_MODEL", "claude-3-5-sonnet-latest")
     replicate_api_token: str = get_env("REPLICATE_API_TOKEN", "")
     flux_base_model: str = get_env("FLUX_BASE_MODEL", "black-forest-labs/flux-schnell")
     flux_fill_model: str = get_env("FLUX_FILL_MODEL", "black-forest-labs/flux-fill-pro")
