@@ -12,6 +12,46 @@ from utils.logging import get_logger
 logger = get_logger(__name__)
 
 
+def _raise_if_model_missing(api_error: APIStatusError) -> None:
+    model_name = CONFIG.providers.anthropic_model
+    status_code = getattr(api_error, "status_code", None)
+
+    if status_code == 404:
+        raise RuntimeError(f"Anthropic model not found or no access: {model_name}") from api_error
+
+    error_candidates = []
+
+    if hasattr(api_error, "response") and hasattr(api_error.response, "json"):
+        try:
+            error_candidates.append(api_error.response.json())
+        except Exception:  # noqa: BLE001
+            pass
+
+    if hasattr(api_error, "body"):
+        error_candidates.append(getattr(api_error, "body"))
+
+    if hasattr(api_error, "error"):
+        error_candidates.append(getattr(api_error, "error"))
+
+    for candidate in error_candidates:
+        if isinstance(candidate, dict):
+            nested = candidate.get("error") if isinstance(candidate.get("error"), dict) else None
+            nested_candidates = [candidate]
+            if nested:
+                nested_candidates.append(nested)
+
+            for nested_candidate in nested_candidates:
+                if isinstance(nested_candidate, dict) and nested_candidate.get("type") == "not_found_error":
+                    raise RuntimeError(
+                        f"Anthropic model not found or no access: {model_name}"
+                    ) from api_error
+        elif getattr(candidate, "type", None) == "not_found_error":
+            raise RuntimeError(f"Anthropic model not found or no access: {model_name}") from api_error
+
+    if "not_found_error" in str(api_error):
+        raise RuntimeError(f"Anthropic model not found or no access: {model_name}") from api_error
+
+
 PROMPT = (
     "You are a product analyst. Extract a strict JSON spec about a knitted hat from the provided photo. "
     "Keep it concise, factual, no marketing tone. Use exact colors, knit pattern, cuff type, patch text/color, pompom presence and color, shape, and materials if visible. "
@@ -104,11 +144,15 @@ def check_headwear_present(image_bytes: bytes, client: Anthropic | None = None) 
         return "YES" in response
 
     except (APIConnectionError, APIStatusError) as api_error:
+        if isinstance(api_error, APIStatusError):
+            _raise_if_model_missing(api_error)
+
         logger.error("Не удалось выполнить проверку головного убора: %s", api_error)
         return None
     except Exception as unexpected_error:  # noqa: BLE001
         logger.error("Неожиданная ошибка проверки головного убора: %s", unexpected_error)
         return None
+
 
 
 def extract_product_spec(image_bytes: bytes, client: Anthropic | None = None) -> Dict[str, Any]:
@@ -138,6 +182,9 @@ def extract_product_spec(image_bytes: bytes, client: Anthropic | None = None) ->
             ],
         )
     except (APIConnectionError, APIStatusError) as api_error:
+        if isinstance(api_error, APIStatusError):
+            _raise_if_model_missing(api_error)
+
         logger.error("Anthropic API error: %s", api_error)
         raise
 
