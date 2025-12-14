@@ -9,6 +9,40 @@ load_dotenv()
 from config import CONFIG
 
 
+def _is_model_missing(api_error, model_name: str) -> bool:
+    status_code = getattr(api_error, "status_code", None)
+    if status_code == 404:
+        return True
+
+    error_candidates = []
+
+    if hasattr(api_error, "response") and hasattr(api_error.response, "json"):
+        try:
+            error_candidates.append(api_error.response.json())
+        except Exception:  # noqa: BLE001
+            pass
+
+    if hasattr(api_error, "body"):
+        error_candidates.append(getattr(api_error, "body"))
+
+    if hasattr(api_error, "error"):
+        error_candidates.append(getattr(api_error, "error"))
+
+    for candidate in error_candidates:
+        if isinstance(candidate, dict):
+            nested = candidate.get("error") if isinstance(candidate.get("error"), dict) else None
+            nested_candidates = [candidate]
+            if nested:
+                nested_candidates.append(nested)
+
+            if any(isinstance(item, dict) and item.get("type") == "not_found_error" for item in nested_candidates):
+                return True
+        elif getattr(candidate, "type", None) == "not_found_error":
+            return True
+
+    return "not_found_error" in str(api_error)
+
+
 def check_telegram():
     """Проверка Telegram Bot Token"""
     print("🔍 Проверка Telegram Bot...")
@@ -46,7 +80,7 @@ def check_anthropic():
         return False
 
     try:
-        from anthropic import Anthropic
+        from anthropic import Anthropic, APIStatusError
 
         client = Anthropic(api_key=api_key)
         message = client.messages.create(
@@ -56,6 +90,12 @@ def check_anthropic():
         )
         print(f"✅ Anthropic доступен, модель: {message.model}")
         return True
+    except APIStatusError as api_error:
+        if _is_model_missing(api_error, model):
+            print(f"❌ Anthropic model not found or no access: {model}")
+        else:
+            print(f"❌ Ошибка Anthropic: {api_error}")
+        return False
     except Exception as e:  # noqa: BLE001
         print(f"❌ Ошибка Anthropic: {e}")
         return False
