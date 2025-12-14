@@ -29,8 +29,12 @@ class PipelineResult:
 
 def _build_base_prompt(spec: Dict[str, Any]) -> str:
     return (
-        "Photorealistic editorial portrait of an adult woman (28-40), neutral background, no hat or headwear, shoulders-up framing. "
-        "Calm confident expression, soft daylight. This is a preview run; keep it simple and low-cost."
+        "Professional high-fashion editorial portrait photograph of a beautiful adult woman model (28-40 years old), "
+        "shoulders-up framing, neutral clean background, soft natural lighting. "
+        "Perfect skin, professional makeup, elegant confident expression. "
+        "CRITICAL: Completely BARE HEAD with NO headwear of any kind - no hat, no cap, no beanie, no hood, "
+        "no helmet, no headband, no bandana, no scarf on head. Hair must be fully visible and uncovered. "
+        "Professional beauty photography standard."
     )
 
 

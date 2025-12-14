@@ -27,11 +27,12 @@ def _ellipse_mask(size: Tuple[int, int]) -> Image.Image:
     draw = ImageDraw.Draw(mask)
 
     # Параметры эллипса для верхней части головы (только макушка)
-    # Центр эллипса: около 0.25 * высоты (верхняя четверть изображения)
-    # Высота эллипса: ~0.35 * высоты
-    # Ширина эллипса: ~0.62 * ширины
-    center_y = height * 0.25
-    ellipse_height = height * 0.35
+    # ОБНОВЛЕНО: Маска поднята выше чтобы покрывать ТОЛЬКО макушку
+    # Центр эллипса: 0.20 * высоты (самая верхняя часть головы)
+    # Высота эллипса: 0.28 * высоты (компактная область)
+    # Ширина эллипса: 0.62 * ширины (покрывает ширину головы)
+    center_y = height * 0.20
+    ellipse_height = height * 0.28
     ellipse_width = width * 0.62
 
     ellipse_box = (
@@ -41,9 +42,9 @@ def _ellipse_mask(size: Tuple[int, int]) -> Image.Image:
         center_y + ellipse_height / 2,      # bottom
     )
 
-    # Проверяем, что нижняя граница эллипса не опускается ниже 0.45 * height
-    # (чтобы не захватить глаза/лицо)
-    bottom_limit = height * 0.45
+    # Проверяем, что нижняя граница эллипса не опускается ниже 0.39 * height
+    # (чтобы НЕ захватить лоб/глаза/лицо - маска ТОЛЬКО на макушке)
+    bottom_limit = height * 0.39
     if ellipse_box[3] > bottom_limit:
         logger.warning(
             f"Ellipse bottom {ellipse_box[3]:.0f} exceeds safe limit {bottom_limit:.0f}, adjusting"
