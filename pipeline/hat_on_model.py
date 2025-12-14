@@ -10,7 +10,7 @@ from typing import Dict, Any, Optional
 from PIL import Image, ImageDraw
 
 from config import CONFIG, QualityMode
-from providers.anthropic import extract_product_spec
+from providers.anthropic import extract_product_spec, check_headwear_present
 from providers.replicate_flux import generate_base_model_image, inpaint_hat
 from utils.image_hash import sha256_hex
 from utils.images import resize_to_max, image_from_bytes, image_to_bytes, ensure_rgb
@@ -27,15 +27,33 @@ class PipelineResult:
     overlay_image: Optional[bytes] = None  # Для режима отладки
 
 
-def _build_base_prompt(spec: Dict[str, Any]) -> str:
-    return (
+def _build_base_prompt(spec: Dict[str, Any], strict_mode: bool = False) -> str:
+    """
+    Создает промпт для генерации базового портрета.
+
+    Args:
+        spec: Спецификация продукта (не используется в базовом промпте)
+        strict_mode: Если True, добавляет еще более строгие ограничения против головных уборов
+    """
+    base = (
         "Professional high-fashion editorial portrait photograph of a beautiful adult woman model (28-40 years old), "
         "shoulders-up framing, neutral clean background, soft natural lighting. "
         "Perfect skin, professional makeup, elegant confident expression. "
-        "CRITICAL: Completely BARE HEAD with NO headwear of any kind - no hat, no cap, no beanie, no hood, "
-        "no helmet, no headband, no bandana, no scarf on head. Hair must be fully visible and uncovered. "
+        "CRITICAL REQUIREMENT: Completely BARE HEAD with absolutely NO headwear, NO head covering of ANY kind. "
+        "Explicitly FORBIDDEN: hat, cap, beanie, hood, helmet, headband, bandana, scarf, headscarf, hijab, turban, "
+        "any fabric on head, any head wrap. "
+        "REQUIRED: Hair must be fully visible, uncovered, and loose. Nothing covering the head or hair. "
         "Professional beauty photography standard."
     )
+
+    if strict_mode:
+        base += (
+            " STRICT MODE: This is a retry generation. The head MUST be completely bare and uncovered. "
+            "Zero tolerance for any headwear, scarves, or head coverings. "
+            "The woman's hair must be clearly visible with no covering whatsoever."
+        )
+
+    return base
 
 
 def _build_fill_prompt(spec: Dict[str, Any]) -> str:
@@ -74,6 +92,71 @@ def _create_overlay_image(base_image: Image.Image, mask_l: Image.Image) -> Image
     return overlay.convert("RGB")
 
 
+def _generate_base_with_headwear_guard(spec: Dict[str, Any], width: int, height: int, steps: int) -> bytes:
+    """
+    Генерирует base image с проверкой на наличие головных уборов.
+    Повторяет генерацию до 2 раз при обнаружении headwear.
+
+    Args:
+        spec: Спецификация продукта
+        width: Ширина изображения
+        height: Высота изображения
+        steps: Количество шагов генерации
+
+    Returns:
+        Байты сгенерированного изображения
+
+    Raises:
+        RuntimeError: Если после всех попыток все еще есть headwear
+    """
+    max_attempts = 3  # Основная попытка + 2 retry
+    is_debug = CONFIG.pipeline.mask_debug
+
+    for attempt in range(max_attempts):
+        strict_mode = attempt > 0  # С 2-й попытки включаем strict mode
+        base_prompt = _build_base_prompt(spec, strict_mode=strict_mode)
+
+        if is_debug:
+            logger.info(
+                f"Base generation attempt {attempt + 1}/{max_attempts}, "
+                f"strict_mode={strict_mode}, "
+                f"model={CONFIG.providers.flux_base_model}"
+            )
+            logger.debug(f"Base prompt: {base_prompt}")
+
+        # Генерируем изображение
+        base_image_bytes = generate_base_model_image(base_prompt, width, height, steps)
+
+        # Проверяем на наличие headwear
+        has_headwear = check_headwear_present(base_image_bytes)
+
+        if is_debug:
+            logger.info(f"Headwear detection result: {'FOUND' if has_headwear else 'CLEAN'}")
+
+        if not has_headwear:
+            logger.info(f"Base image generated successfully (attempt {attempt + 1})")
+            return base_image_bytes
+
+        # Если headwear обнаружен и это не последняя попытка
+        if attempt < max_attempts - 1:
+            logger.warning(
+                f"Headwear detected in base image (attempt {attempt + 1}/{max_attempts}), "
+                f"retrying with stricter prompt..."
+            )
+        else:
+            # Последняя попытка и все еще есть headwear
+            error_msg = (
+                "Не удалось создать портрет без головных уборов после 3 попыток. "
+                "Модель генерации упорно добавляет головные уборы. "
+                "Пожалуйста, попробуйте запустить генерацию заново."
+            )
+            logger.error(error_msg)
+            raise RuntimeError(error_msg)
+
+    # Этот код не должен быть достижим, но для безопасности
+    raise RuntimeError("Unexpected error in base generation")
+
+
 def _save_debug_images(request_id: str, base_image: Image.Image, mask_l: Image.Image,
                        final_image_bytes: bytes, overlay: Image.Image) -> None:
     """
@@ -106,8 +189,9 @@ def generate_hat_on_model(product_image: bytes, quality_mode: QualityMode | None
     spec = extract_product_spec(resized_bytes)
 
     width = height = CONFIG.pipeline.max_size
-    base_prompt = _build_base_prompt(spec)
-    base_image_bytes = generate_base_model_image(base_prompt, width, height, steps)
+
+    # Генерируем base image с проверкой на головные уборы (guard)
+    base_image_bytes = _generate_base_with_headwear_guard(spec, width, height, steps)
     base_image = ensure_rgb(image_from_bytes(base_image_bytes))
 
     mask_l = create_head_mask(base_image)

@@ -17,6 +17,64 @@ PROMPT = (
     "visual (English ultra-detailed hat description for image conditioning)."
 )
 
+HEADWEAR_CHECK_PROMPT = (
+    "Look at this portrait photograph carefully. "
+    "Is the woman wearing ANY headwear, head covering, or anything on her head? "
+    "This includes: hat, cap, beanie, hood, helmet, headband, bandana, scarf, headscarf, hijab, turban, "
+    "head wrap, or any fabric/accessory covering any part of the head or hair. "
+    "Answer ONLY with YES or NO. "
+    "If you see absolutely nothing on the head and the hair is fully visible and uncovered, answer NO. "
+    "If there is anything covering the head or hair, answer YES."
+)
+
+
+def check_headwear_present(image_bytes: bytes, client: Anthropic | None = None) -> bool:
+    """
+    Проверяет наличие головных уборов на изображении через Claude.
+
+    Args:
+        image_bytes: Байты изображения для проверки
+        client: Опциональный клиент Anthropic
+
+    Returns:
+        True если обнаружен головной убор, False если голова чистая
+    """
+    if not image_bytes:
+        raise ValueError("Пустое изображение для проверки")
+
+    image_b64 = base64.b64encode(image_bytes).decode('utf-8')
+    client = client or Anthropic(api_key=CONFIG.providers.anthropic_api_key)
+
+    try:
+        message = client.messages.create(
+            model=CONFIG.providers.anthropic_model,
+            max_tokens=10,  # Нужен только YES/NO
+            temperature=0,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": HEADWEAR_CHECK_PROMPT},
+                        {
+                            "type": "image",
+                            "source": {"type": "base64", "media_type": "image/png", "data": image_b64}
+                        },
+                    ],
+                }
+            ],
+        )
+
+        response = message.content[0].text.strip().upper() if message.content else "YES"
+        logger.info(f"Headwear check response: {response}")
+
+        # Если ответ содержит YES - есть головной убор
+        return "YES" in response
+
+    except (APIConnectionError, APIStatusError) as api_error:
+        logger.error("Anthropic API error during headwear check: %s", api_error)
+        # В случае ошибки API - считаем что headwear есть (безопаснее)
+        return True
+
 
 def extract_product_spec(image_bytes: bytes, client: Anthropic | None = None) -> Dict[str, Any]:
     if not image_bytes:
