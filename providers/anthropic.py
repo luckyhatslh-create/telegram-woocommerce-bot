@@ -1,8 +1,10 @@
 import base64
 import json
-from typing import Dict, Any
+from io import BytesIO
+from typing import Dict, Any, Optional
 
 from anthropic import Anthropic, APIConnectionError, APIStatusError
+from PIL import Image
 
 from config import CONFIG
 from utils.logging import get_logger
@@ -68,7 +70,30 @@ HEADWEAR_CHECK_PROMPT = (
 )
 
 
-def check_headwear_present(image_bytes: bytes, client: Anthropic | None = None) -> bool:
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+JPEG_SIGNATURE = b"\xff\xd8"
+
+
+def _normalize_image_payload(image_bytes: bytes) -> tuple[str, bytes]:
+    """Определяет тип изображения и при необходимости конвертирует в PNG."""
+
+    if image_bytes.startswith(PNG_SIGNATURE):
+        return "image/png", image_bytes
+
+    if image_bytes.startswith(JPEG_SIGNATURE):
+        return "image/jpeg", image_bytes
+
+    try:
+        image = Image.open(BytesIO(image_bytes))
+        buffer = BytesIO()
+        image.save(buffer, format="PNG")
+        return "image/png", buffer.getvalue()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Не удалось определить тип изображения, отправляем как PNG: %s", exc)
+        return "image/png", image_bytes
+
+
+def check_headwear_present(image_bytes: bytes, client: Anthropic | None = None) -> Optional[bool]:
     """
     Проверяет наличие головных уборов на изображении через Claude.
 
@@ -77,12 +102,13 @@ def check_headwear_present(image_bytes: bytes, client: Anthropic | None = None) 
         client: Опциональный клиент Anthropic
 
     Returns:
-        True если обнаружен головной убор, False если голова чистая
+        True если обнаружен головной убор, False если голова чистая, None если проверка не удалась
     """
     if not image_bytes:
         raise ValueError("Пустое изображение для проверки")
 
-    image_b64 = base64.b64encode(image_bytes).decode('utf-8')
+    media_type, normalized_bytes = _normalize_image_payload(image_bytes)
+    image_b64 = base64.b64encode(normalized_bytes).decode('utf-8')
     client = client or Anthropic(api_key=CONFIG.providers.anthropic_api_key)
 
     try:
@@ -97,14 +123,21 @@ def check_headwear_present(image_bytes: bytes, client: Anthropic | None = None) 
                         {"type": "text", "text": HEADWEAR_CHECK_PROMPT},
                         {
                             "type": "image",
-                            "source": {"type": "base64", "media_type": "image/png", "data": image_b64}
+                            "source": {"type": "base64", "media_type": media_type, "data": image_b64}
                         },
                     ],
                 }
             ],
         )
 
-        response = message.content[0].text.strip().upper() if message.content else "YES"
+        if not message.content:
+            logger.warning("Пустой ответ Claude при проверке головного убора")
+            return None
+
+        response = (message.content[0].text or "").strip().upper()
+        if response not in ("YES", "NO"):
+            logger.warning("Неверный формат ответа Claude при проверке головного убора: %s", response)
+            return None
         logger.info(f"Headwear check response: {response}")
 
         # Если ответ содержит YES - есть головной убор
@@ -114,17 +147,20 @@ def check_headwear_present(image_bytes: bytes, client: Anthropic | None = None) 
         if isinstance(api_error, APIStatusError):
             _raise_if_model_missing(api_error)
 
-        logger.error("Anthropic API error during headwear check: %s", api_error)
-        # В случае ошибки API - считаем что headwear есть (безопаснее)
-        return True
+        logger.error("Не удалось выполнить проверку головного убора: %s", api_error)
+        return None
+    except Exception as unexpected_error:  # noqa: BLE001
+        logger.error("Неожиданная ошибка проверки головного убора: %s", unexpected_error)
+        return None
+
 
 
 def extract_product_spec(image_bytes: bytes, client: Anthropic | None = None) -> Dict[str, Any]:
     if not image_bytes:
         raise ValueError("Пустое изображение для анализа")
 
-    # Конвертируем байты в base64 строку
-    image_b64 = base64.b64encode(image_bytes).decode('utf-8')
+    media_type, normalized_bytes = _normalize_image_payload(image_bytes)
+    image_b64 = base64.b64encode(normalized_bytes).decode('utf-8')
 
     client = client or Anthropic(api_key=CONFIG.providers.anthropic_api_key)
     try:
@@ -139,7 +175,7 @@ def extract_product_spec(image_bytes: bytes, client: Anthropic | None = None) ->
                     "content": [
                         {"type": "text", "text": PROMPT},
                         {
-                            "type": "image", "source": {"type": "base64", "media_type": "image/png", "data": image_b64}
+                            "type": "image", "source": {"type": "base64", "media_type": media_type, "data": image_b64}
                         },
                     ],
                 }
