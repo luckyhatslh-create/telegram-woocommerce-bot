@@ -1,6 +1,8 @@
 import os
-import requests
 import base64
+
+import pytest
+import requests
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -9,8 +11,15 @@ url = os.getenv('WC_URL')
 key = os.getenv('WC_KEY')
 secret = os.getenv('WC_SECRET')
 
+if __name__ != "__main__" and (not url or not key or not secret):
+    pytest.skip("WC_URL/WC_KEY/WC_SECRET не заданы — пропускаем интеграционный тест загрузки.", allow_module_level=True)
+
+if __name__ == "__main__" and (not url or not key or not secret):
+    print("❌ Не заданы WC_URL, WC_KEY или WC_SECRET. Добавьте их в .env для проверки загрузки.")
+    exit(1)
+
 # Ensure URL ends with slash
-if not url.endswith('/'):
+if url and not url.endswith('/'):
     url += '/'
 
 # Construct Media Endpoint
