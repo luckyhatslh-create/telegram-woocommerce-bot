@@ -92,6 +92,18 @@ def _create_overlay_image(base_image: Image.Image, mask_l: Image.Image) -> Image
     return overlay.convert("RGB")
 
 
+def _apply_flux_schnell_min_steps(steps: int) -> int:
+    """Повышает количество шагов для flux-schnell до минимального значения."""
+
+    min_steps = CONFIG.pipeline.min_flux_schnell_steps
+    if "flux-schnell" in CONFIG.providers.flux_base_model and steps < min_steps:
+        logger.info(
+            "Количество шагов для flux-schnell увеличено с %s до %s по умолчанию", steps, min_steps
+        )
+        return min_steps
+    return steps
+
+
 def _generate_base_with_headwear_guard(spec: Dict[str, Any], width: int, height: int, steps: int) -> bytes:
     """
     Генерирует base image с проверкой на наличие головных уборов.
@@ -131,7 +143,19 @@ def _generate_base_with_headwear_guard(spec: Dict[str, Any], width: int, height:
         has_headwear = check_headwear_present(base_image_bytes)
 
         if is_debug:
-            logger.info(f"Headwear detection result: {'FOUND' if has_headwear else 'CLEAN'}")
+            state = "UNKNOWN" if has_headwear is None else ("FOUND" if has_headwear else "CLEAN")
+            logger.info(f"Headwear detection result: {state}")
+
+        if has_headwear is None:
+            logger.warning(
+                "Проверка головного убора не сработала, результат неизвестен. "
+                "Продолжаем работу, возможна повторная попытка."
+            )
+            if attempt < max_attempts - 1:
+                logger.info("Повторяем генерацию из-за сбоя проверки головного убора...")
+                continue
+            logger.info("Продолжаем с текущим изображением без подтверждения проверки.")
+            return base_image_bytes
 
         if not has_headwear:
             logger.info(f"Base image generated successfully (attempt {attempt + 1})")
@@ -184,6 +208,7 @@ def _save_debug_images(request_id: str, base_image: Image.Image, mask_l: Image.I
 def generate_hat_on_model(product_image: bytes, quality_mode: QualityMode | None = None) -> PipelineResult:
     quality = quality_mode or CONFIG.pipeline.quality_mode
     steps = CONFIG.pipeline.steps_hq if quality == "hq" else CONFIG.pipeline.steps_preview
+    steps = _apply_flux_schnell_min_steps(steps)
 
     resized_bytes, _ = resize_to_max(product_image, CONFIG.pipeline.max_size)
     spec = extract_product_spec(resized_bytes)
