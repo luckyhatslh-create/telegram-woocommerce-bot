@@ -20,6 +20,12 @@ from utils.mask import create_head_mask
 logger = get_logger(__name__)
 
 
+def _select_flux_base_model(quality: QualityMode) -> str:
+    if quality == "hq":
+        return CONFIG.providers.flux_base_model
+    return CONFIG.providers.flux_base_model_preview
+
+
 @dataclass
 class PipelineResult:
     final_image: bytes
@@ -92,19 +98,9 @@ def _create_overlay_image(base_image: Image.Image, mask_l: Image.Image) -> Image
     return overlay.convert("RGB")
 
 
-def _apply_flux_schnell_min_steps(steps: int) -> int:
-    """Повышает количество шагов для flux-schnell до минимального значения."""
-
-    min_steps = CONFIG.pipeline.min_flux_schnell_steps
-    if "flux-schnell" in CONFIG.providers.flux_base_model and steps < min_steps:
-        logger.info(
-            "Количество шагов для flux-schnell увеличено с %s до %s по умолчанию", steps, min_steps
-        )
-        return min_steps
-    return steps
-
-
-def _generate_base_with_headwear_guard(spec: Dict[str, Any], width: int, height: int, steps: int) -> bytes:
+def _generate_base_with_headwear_guard(
+    spec: Dict[str, Any], width: int, height: int, steps: int, base_model: str
+) -> bytes:
     """
     Генерирует base image с проверкой на наличие головных уборов.
     Повторяет генерацию до 2 раз при обнаружении headwear.
@@ -132,12 +128,12 @@ def _generate_base_with_headwear_guard(spec: Dict[str, Any], width: int, height:
             logger.info(
                 f"Base generation attempt {attempt + 1}/{max_attempts}, "
                 f"strict_mode={strict_mode}, "
-                f"model={CONFIG.providers.flux_base_model}"
+                f"model={base_model}"
             )
             logger.debug(f"Base prompt: {base_prompt}")
 
         # Генерируем изображение
-        base_image_bytes = generate_base_model_image(base_prompt, width, height, steps)
+        base_image_bytes = generate_base_model_image(base_prompt, width, height, steps, model=base_model)
 
         # Проверяем на наличие headwear
         has_headwear = check_headwear_present(base_image_bytes)
@@ -208,7 +204,7 @@ def _save_debug_images(request_id: str, base_image: Image.Image, mask_l: Image.I
 def generate_hat_on_model(product_image: bytes, quality_mode: QualityMode | None = None) -> PipelineResult:
     quality = quality_mode or CONFIG.pipeline.quality_mode
     steps = CONFIG.pipeline.steps_hq if quality == "hq" else CONFIG.pipeline.steps_preview
-    steps = _apply_flux_schnell_min_steps(steps)
+    base_model = _select_flux_base_model(quality)
 
     resized_bytes, _ = resize_to_max(product_image, CONFIG.pipeline.max_size)
     spec = extract_product_spec(resized_bytes)
@@ -216,7 +212,7 @@ def generate_hat_on_model(product_image: bytes, quality_mode: QualityMode | None
     width = height = CONFIG.pipeline.max_size
 
     # Генерируем base image с проверкой на головные уборы (guard)
-    base_image_bytes = _generate_base_with_headwear_guard(spec, width, height, steps)
+    base_image_bytes = _generate_base_with_headwear_guard(spec, width, height, steps, base_model)
     base_image = ensure_rgb(image_from_bytes(base_image_bytes))
 
     mask_l = create_head_mask(base_image)
@@ -240,6 +236,7 @@ def generate_hat_on_model(product_image: bytes, quality_mode: QualityMode | None
     metadata = {
         "spec": spec,
         "quality_mode": quality,
+        "base_model": base_model,
         "steps": steps,
         "hashes": {
             "product": sha256_hex(product_image),

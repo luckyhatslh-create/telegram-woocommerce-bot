@@ -1,7 +1,7 @@
 import base64
 import time
 import requests
-from typing import Dict
+from typing import Dict, Optional
 
 import httpx
 import replicate
@@ -13,14 +13,27 @@ from utils.logging import get_logger
 logger = get_logger(__name__)
 
 
+def _clamp_steps_for_model(model: str, steps: int) -> int:
+    if "flux-schnell" in model and steps > 4:
+        logger.info(
+            "Модель %s поддерживает максимум 4 шага, уменьшаем запрос с %s до 4", model, steps
+        )
+        return 4
+    return steps
+
+
 def _fetch_image(url: str) -> bytes:
     response = requests.get(url, timeout=60)
     response.raise_for_status()
     return response.content
 
 
-def generate_base_model_image(prompt: str, width: int, height: int, steps: int) -> bytes:
+def generate_base_model_image(
+    prompt: str, width: int, height: int, steps: int, model: Optional[str] = None
+) -> bytes:
     client = replicate.Client(api_token=CONFIG.providers.replicate_api_token)
+    base_model = model or CONFIG.providers.flux_base_model
+    steps = _clamp_steps_for_model(base_model, steps)
     input_payload: Dict[str, object] = {
         "prompt": prompt,
         "width": width,
@@ -34,7 +47,7 @@ def generate_base_model_image(prompt: str, width: int, height: int, steps: int) 
     max_retries = 5  # Увеличено до 5 попыток из-за rate limiting
     for attempt in range(max_retries):
         try:
-            output = client.run(CONFIG.providers.flux_base_model, input=input_payload)
+            output = client.run(base_model, input=input_payload)
             break
         except ReplicateError as e:
             if e.status == 429 and attempt < max_retries - 1:
