@@ -17,11 +17,14 @@ TELEGRAM_BOT_TOKEN=xxx
 ANTHROPIC_API_KEY=xxx
 REPLICATE_API_TOKEN=xxx
 FLUX_BASE_MODEL=black-forest-labs/flux-schnell
+FLUX_BASE_MODEL_PREVIEW=black-forest-labs/flux-schnell
 FLUX_FILL_MODEL=black-forest-labs/flux-fill-pro
 MAX_SIZE=512
-STEPS_PREVIEW=20
-STEPS_HQ=35
+STEPS_PREVIEW=4
+STEPS_HQ=4
 ```
+
+> `flux-schnell` поддерживает **не более 4 шагов**; более высокое значение будет автоматически уменьшено. Для другой модели (например, `flux-pro`) можно увеличить `STEPS_PREVIEW`/`STEPS_HQ`. Переменная `FLUX_BASE_MODEL_PREVIEW` позволяет указать отдельную модель для дешёвого режима (по умолчанию используется `FLUX_BASE_MODEL`).
 
 > Значения `MAX_SIZE`, `STEPS_PREVIEW` и `STEPS_HQ` управляют качеством и стоимостью. По умолчанию используется экономный **preview**.
 

@@ -30,11 +30,16 @@ pip install -r requirements.txt
 3. Придумайте имя для бота
 4. Скопируйте токен
 
-### OpenAI
+### Anthropic Claude (анализ изображений)
 
-1. Зайдите на [platform.openai.com](https://platform.openai.com/)
-2. Создайте API ключ в разделе "API Keys"
-3. Пополните баланс минимум на $10
+1. Получите ключ на [console.anthropic.com](https://console.anthropic.com/)
+2. Сохраните его как `ANTHROPIC_API_KEY`
+
+### Replicate (FLUX)
+
+1. Создайте токен на [replicate.com/account/api-tokens](https://replicate.com/account/api-tokens)
+2. Сохраните его как `REPLICATE_API_TOKEN`
+3. По умолчанию используется `black-forest-labs/flux-schnell` (максимум **4 шага**). Если хотите другую модель в preview, задайте `FLUX_BASE_MODEL_PREVIEW`.
 
 ### WooCommerce
 
@@ -57,11 +62,17 @@ nano .env  # или любой другой редактор
 Пример заполнения:
 ```env
 TELEGRAM_BOT_TOKEN=1234567890:AAAAAAA-ExampleToken-BBBBBBBBBBB
-OPENAI_API_KEY=sk-EXAMPLE_KEY_NOT_REAL_xxxxxxxxxxxxxxxxx
-WC_URL=https://myshop.ru
-WC_KEY=ck_EXAMPLE_CONSUMER_KEY_xxxxxxxxxxxxxxxxx
-WC_SECRET=cs_EXAMPLE_CONSUMER_SECRET_xxxxxxxxxxxx
+ANTHROPIC_API_KEY=sk-ant-api-key
+REPLICATE_API_TOKEN=r8_...
+FLUX_BASE_MODEL=black-forest-labs/flux-schnell
+FLUX_BASE_MODEL_PREVIEW=black-forest-labs/flux-schnell
+FLUX_FILL_MODEL=black-forest-labs/flux-fill-pro
+MAX_SIZE=512
+STEPS_PREVIEW=4
+STEPS_HQ=4
 ```
+
+> `flux-schnell` поддерживает максимум 4 шага. Значения `STEPS_PREVIEW`/`STEPS_HQ` выше 4 будут автоматически уменьшены. Для HQ можно выбрать более тяжёлую модель (например, `flux-pro`) через `FLUX_BASE_MODEL`, а для preview — отдельную через `FLUX_BASE_MODEL_PREVIEW`.
 
 ## Шаг 4: Проверка подключения
 
@@ -105,11 +116,11 @@ python bot.py
 - Показывайте товар с разных ракурсов
 - Избегайте размытых фото
 
-### Экономия токенов OpenAI
+### Экономия вызовов Anthropic/Replicate
 
-- Используйте `quality="standard"` вместо `"hd"` для DALL-E
-- Отправляйте 3-4 фото вместо большего количества
-- При необходимости используйте модель `gpt-4o-mini` вместо `gpt-4o`
+- Держите `STEPS_PREVIEW`/`STEPS_HQ` на минимально допустимых значениях (для `flux-schnell` — не выше 4)
+- Используйте preview-модель через `FLUX_BASE_MODEL_PREVIEW`, если HQ качество не требуется
+- Снижайте `MAX_SIZE`, чтобы ускорить генерацию и уменьшить стоимость
 
 ### Безопасность
 
