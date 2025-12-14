@@ -18,16 +18,40 @@ class MaskGenerationError(Exception):
 
 
 def _ellipse_mask(size: Tuple[int, int]) -> Image.Image:
+    """
+    Создает эллиптическую маску для верхней части головы (область шапки).
+    ВАЖНО: Маска НЕ должна покрывать глаза, нос или рот!
+    """
     width, height = size
     mask = Image.new("L", size, 0)
     draw = ImageDraw.Draw(mask)
+
+    # Параметры эллипса для верхней части головы (только макушка)
+    # Центр эллипса: около 0.25 * высоты (верхняя четверть изображения)
+    # Высота эллипса: ~0.35 * высоты
+    # Ширина эллипса: ~0.62 * ширины
+    center_y = height * 0.25
+    ellipse_height = height * 0.35
+    ellipse_width = width * 0.62
+
     ellipse_box = (
-        width * 0.2,
-        height * 0.05,
-        width * 0.8,
-        height * 0.55,
+        width * 0.5 - ellipse_width / 2,   # left
+        center_y - ellipse_height / 2,      # top
+        width * 0.5 + ellipse_width / 2,   # right
+        center_y + ellipse_height / 2,      # bottom
     )
+
+    # Проверяем, что нижняя граница эллипса не опускается ниже 0.45 * height
+    # (чтобы не захватить глаза/лицо)
+    bottom_limit = height * 0.45
+    if ellipse_box[3] > bottom_limit:
+        logger.warning(
+            f"Ellipse bottom {ellipse_box[3]:.0f} exceeds safe limit {bottom_limit:.0f}, adjusting"
+        )
+        ellipse_box = (ellipse_box[0], ellipse_box[1], ellipse_box[2], bottom_limit)
+
     draw.ellipse(ellipse_box, fill=255)
+    logger.info(f"Fallback ellipse mask: {ellipse_box}, image size: {size}")
     return mask
 
 

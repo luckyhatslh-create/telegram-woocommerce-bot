@@ -44,6 +44,15 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         )
         return
 
+    # Отправляем overlay изображение если включен режим отладки
+    if CONFIG.pipeline.mask_debug and result.overlay_image:
+        overlay_bio = BytesIO(result.overlay_image)
+        overlay_bio.name = "mask_overlay.png"
+        await update.message.reply_photo(
+            photo=overlay_bio,
+            caption="🔍 DEBUG: Красная область показывает маску для инпейнтинга"
+        )
+
     bio = BytesIO(result.final_image)
     bio.name = "model_hat.png"
     await update.message.reply_photo(photo=bio, caption="✅ Готово! Использован режим preview по умолчанию.")

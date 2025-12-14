@@ -19,6 +19,15 @@ def get_int(name: str, default: int) -> int:
         return default
 
 
+def get_bool(name: str, default: bool = False) -> bool:
+    value = os.getenv(name, "").lower()
+    if value in ("1", "true", "yes", "on"):
+        return True
+    elif value in ("0", "false", "no", "off", ""):
+        return False
+    return default
+
+
 @dataclass
 class ProviderSettings:
     anthropic_api_key: str = get_env("ANTHROPIC_API_KEY", "")
@@ -36,6 +45,7 @@ class PipelineSettings:
     steps_hq: int = get_int("STEPS_HQ", 35)
     timeout_seconds: int = get_int("PIPELINE_TIMEOUT", 90)
     retries: int = get_int("PIPELINE_RETRIES", 1)
+    mask_debug: bool = get_bool("MASK_DEBUG", False)
 
 
 @dataclass
